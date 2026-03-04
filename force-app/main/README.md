@@ -200,7 +200,7 @@ else:
 
 | Element         | Usage                 | Example                            |
 | --------------- | --------------------- | ---------------------------------- |
-| `config:`       | Agent metadata        | `agent_name: "MyAgent"`            |
+| `config:`       | Agent metadata        | `developer_name: "MyAgent"`        |
 | `system:`       | Global settings       | `instructions: "You are..."`       |
 | `variables:`    | State declaration     | `name: mutable string = ""`        |
 | `topic name:`   | Define topic          | `topic greeting:`                  |

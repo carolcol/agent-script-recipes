@@ -94,7 +94,7 @@ Multiple `run` statements execute in sequence after the primary action.
 
 ```agentscript
 config:
-   agent_name: "ActionCallbacks"
+   developer_name: "ActionCallbacks"
    agent_label: "ActionCallbacks"
    agent_type: "AgentforceEmployeeAgent"
    description: "Processes payments with post-action callbacks"

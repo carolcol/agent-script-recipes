@@ -73,7 +73,7 @@ system:
         error: "Something went wrong."
 
 config:
-    agent_name: "PromptTemplateActions"
+    developer_name: "PromptTemplateActions"
     agent_label: "PromptTemplateActions"
     agent_type: "AgentforceEmployeeAgent"
     description: "Provides guidance to guests by creating personalized schedules."

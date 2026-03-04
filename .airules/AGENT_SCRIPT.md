@@ -58,7 +58,7 @@ Top-level blocks MUST appear in this order:
 ```agentscript
 # 1. CONFIG (required) - Agent metadata
 config:
-   agent_name: "DescriptiveName"
+   developer_name: "DescriptiveName"
    ...
 
 # 2. VARIABLES (optional) - State management
@@ -123,7 +123,7 @@ topic my_topic:
 
 Every Agent Script MUST have:
 
-- `config` block with `agent_name`
+- `config` block with `developer_name`
 - `system` block with `messages.welcome`, `messages.error`, and `instructions`
 - `start_agent` block with `description` and `reasoning.actions`
 - At least one `topic` block with `description` and `reasoning`
@@ -132,7 +132,7 @@ Every Agent Script MUST have:
 
 ## Naming Rules
 
-All names (agent_name, topic names, variable names, action names):
+All names (developer_name, topic names, variable names, action names):
 
 - Can contain only letters, numbers, and underscores
 - Must begin with a letter
@@ -153,7 +153,7 @@ All names (agent_name, topic names, variable names, action names):
 ```agentscript
 # This is a comment
 config:
-   agent_name: "My_Agent"  # Inline comment
+   developer_name: "My_Agent"  # Inline comment
 ```
 
 ---
@@ -165,10 +165,10 @@ config:
 ```agentscript
 config:
    # Required
-   agent_name: "DescriptiveName"           # Unique identifier (letters, numbers, underscores)
+   developer_name: "DescriptiveName"           # Unique identifier (letters, numbers, underscores)
 
    # Optional with defaults
-   agent_label: "DescriptiveName"               # Display name (defaults to normalized agent_name)
+   agent_label: "DescriptiveName"               # Display name (defaults to normalized developer_name)
    description: "Agent description"       # What the agent does
    agent_type: "AgentforceServiceAgent"  # or "AgentforceEmployeeAgent"
    default_agent_user: "user@example.com" # Required for AgentforceServiceAgent
@@ -579,7 +579,7 @@ instructions:->
 
 ```agentscript
 config:
-   agent_name: "Simple_QA"
+   developer_name: "Simple_QA"
 
 system:
    messages:
@@ -672,7 +672,7 @@ topic customer_service:
 Before finalizing an Agent Script, verify:
 
 - [ ] Block ordering is correct (config → variables → system → connections → knowledge → language → start_agent → topics)
-- [ ] `config` block has `agent_name` (and `default_agent_user` for service agents)
+- [ ] `config` block has `developer_name` (and `default_agent_user` for service agents)
 - [ ] `system` block has `messages.welcome`, `messages.error`, and `instructions`
 - [ ] `start_agent` block exists with at least one transition action
 - [ ] Each `topic` has a `description` and `reasoning` block
