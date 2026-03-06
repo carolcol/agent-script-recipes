@@ -3,7 +3,7 @@ system:
 
     messages:
         welcome: |
-            Hi, I'm an AI service assistant. How can I help you?
+            Hi, I'm your Travel Assist agent. I can help with trip questions, booking changes, delays, cancellations, lost baggage, and travel policy support. What do you need help with right now?
         error: "Sorry, it looks like something has gone wrong."
 
 config:
