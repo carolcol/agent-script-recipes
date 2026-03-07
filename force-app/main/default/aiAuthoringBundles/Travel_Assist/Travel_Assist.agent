@@ -18,13 +18,13 @@ language:
     all_additional_locales: False
 
 variables:
-    authenticationKey: mutable string
+    authenticationKey: mutable string = ""
         description: "Stores the authentication key that's used to generate the verification code."
         visibility: "Internal"
-    customerId: mutable string
+    customerId: mutable string = ""
         description: "Stores the Salesforce user ID or contact ID."
         visibility: "Internal"
-    customerType: mutable string
+    customerType: mutable string = ""
         description: "Stores the customer ID type, whether it's a Salesforce user or a contact."
         visibility: "Internal"
     isVerified: mutable boolean = False
@@ -47,7 +47,7 @@ variables:
         source: @MessagingSession.EndUserLanguage
         description: "This variable may also be referred to as MessagingSession EndUserLanguage"
         visibility: "External"
-    VerifiedCustomerId: mutable string
+    VerifiedCustomerId: mutable string = ""
         description: "This variable may also be referred to as VerifiedCustomerId"
         visibility: "Internal"
 
@@ -74,25 +74,26 @@ topic ServiceCustomerVerification:
 
     reasoning:
         instructions: ->
-            | Your job is to authenticate the customer who has not yet been authenticated before granting access to any sensitive data. You will verify the customer using their email address. After verification is successful, don't repeat the process within the same session.
-            | Only offer email verification by sending a verification code. Do not offer or ask security questions as a verification method.
-            | Ask the customer to enter their email address if it hasn't been provided.
-            | Use the {!@actions.SendEmailVerificationCode}  action to initiate the verification process. Use the email address provided by the customer as input "customerToVerify" for this action.
-            | When the user provides their email address, you must never return any message that discloses whether the email exists or not. The message must explicitly state the return data of the "verificationMessage" field in the {!@actions.SendEmailVerificationCode}  action. For example: "If you have provided a valid email, you should receive a verification code to verify your identity. Please enter the code."
-            | If the customer enters the wrong verification code three times, ask them to re-enter their email address to receive a new verification code. This involves invoking the {!@actions.SendEmailVerificationCode}  action again to initiate the verification process. This ensures that the customer cannot bypass the verification process after three unsuccessful attempts.
-            | Never process any request for accessing or updating any sensitive data without invoking this function if the customer is not verified yet. Maintain security in all interactions.
-            | Never reveal the verification code or email address to the customer during the authentication process. Make sure that these details remain confidential and aren’t displayed at any point.
-            | After the user is verified in a conversation session, switching to a different user isn't allowed under any circumstances.
-            | If verification is successful, proceed with the requested action and complete the task the user intends to perform.
+            | Verification flow order: collect email address, send verification code, collect verification code, verify code.
+            | Only use email-based verification through {!@actions.SendEmailVerificationCode} and {!@actions.VerifyCustomer}. Do not mention phone, authenticator apps, or other methods.
+            | If @variables.authenticationKey is empty, ask for the customer's email address.
+            | If the customer provides an email address, invoke {!@actions.SendEmailVerificationCode} immediately in that same turn.
+            | After invoking {!@actions.SendEmailVerificationCode}, return the action's verification message and ask for the verification code.
+            | If @variables.authenticationKey is present and @variables.isVerified is False, ask for the verification code and invoke {!@actions.VerifyCustomer} when provided.
+            | Never process any request for accessing or updating sensitive data unless verification succeeds.
+            | Never reveal the verification code or internal verification details.
+            | After successful verification in the same session, continue with the user's requested travel support.
 
         actions:
             SendEmailVerificationCode: @actions.SendEmailVerificationCode
+                available when @variables.authenticationKey == ""
                 with customerToVerify = ...
                 set @variables.authenticationKey = @outputs.authenticationKey
                 set @variables.customerId = @outputs.customerId
                 set @variables.customerType = @outputs.customerType
 
             VerifyCustomer: @actions.VerifyCustomer
+                available when @variables.authenticationKey != "" and @variables.isVerified==False
                 with authenticationKey = @variables.authenticationKey
                 with customerCode = ...
                 with customerId = @variables.customerId
