@@ -50,23 +50,34 @@ variables:
     VerifiedCustomerId: mutable string = ""
         description: "This variable may also be referred to as VerifiedCustomerId"
         visibility: "Internal"
+    flightNumber: mutable string = ""
+        description: "Stores the flight number provided by the customer for status lookup."
+        visibility: "Internal"
 
-start_agent topic_selector:
-    label: "Topic Selector"
+start_agent verification_gate:
+    label: "Verification Gate"
 
-    description: "Welcome the user and determine the appropriate topic based on user input"
+    description: "Entry point that enforces customer verification before request handling."
 
     reasoning:
         instructions: ->
-            | If @variables.isVerified is False, always transition to ServiceCustomerVerification first.
-            | Do not route to any other topic until verification succeeds, unless the customer's first message is clearly off-topic.
-            | Select the best tool to call based on conversation history and user's intent.
+            if not @variables.isVerified:
+                | Always call {!@actions.go_to_ServiceCustomerVerification}. Do not respond directly in start_agent while verification is pending.
+            if @variables.isVerified:
+                | Always call {!@actions.go_to_TopicSelector} to handle the customer's request.
+            | Use {!@actions.go_to_off_topic} only when the request is outside travel support scope.
 
         actions:
             go_to_ServiceCustomerVerification: @utils.transition to @topic.ServiceCustomerVerification
-                available when @variables.isVerified==False
+                description: "Verify customer identity before handling requests."
+                available when @variables.isVerified == False
+
+            go_to_TopicSelector: @utils.transition to @topic.TopicSelector
+                description: "Route verified customer requests to the appropriate travel support path."
+                available when @variables.isVerified == True
 
             go_to_off_topic: @utils.transition to @topic.off_topic
+                description: "Redirect requests outside travel support scope."
 topic ServiceCustomerVerification:
     label: "Service Customer Verification"
 
@@ -76,10 +87,18 @@ topic ServiceCustomerVerification:
         instructions: ->
             | Verification flow order: collect email address, send verification code, collect verification code, verify code.
             | Only use email-based verification through {!@actions.SendEmailVerificationCode} and {!@actions.VerifyCustomer}. Do not mention phone, authenticator apps, or other methods.
-            | If @variables.authenticationKey is empty, ask for the customer's email address.
-            | If the customer provides an email address, invoke {!@actions.SendEmailVerificationCode} immediately in that same turn.
-            | After invoking {!@actions.SendEmailVerificationCode}, return the action's verification message and ask for the verification code.
-            | If @variables.authenticationKey is present and @variables.isVerified is False, ask for the verification code and invoke {!@actions.VerifyCustomer} when provided.
+            | Before verification succeeds, request only two inputs: email address and verification code.
+            | Before verification succeeds, do not ask for full name, booking reference, reservation number, itinerary details, or any other identifiers.
+            | If the user shares travel details before verification, acknowledge briefly and continue the verification flow.
+            | Before @variables.isVerified == True, do not ask any additional question besides email or verification code.
+            | Before @variables.isVerified == True, do not provide travel guidance, booking help, or next-step planning.
+            if @variables.authenticationKey == "":
+                | Ask for the customer's email address.
+                | If the customer provides an email address, invoke {!@actions.SendEmailVerificationCode} in the same turn.
+                | After email is provided, return the verification message and ask for the code only.
+            if @variables.authenticationKey != "" and @variables.isVerified == False:
+                | Ask for the verification code.
+                | If the customer provides a verification code, invoke {!@actions.VerifyCustomer} in the same turn.
             | Never process any request for accessing or updating sensitive data unless verification succeeds.
             | Never reveal the verification code or internal verification details.
             | After successful verification in the same session, continue with the user's requested travel support.
@@ -93,7 +112,7 @@ topic ServiceCustomerVerification:
                 set @variables.customerType = @outputs.customerType
 
             VerifyCustomer: @actions.VerifyCustomer
-                available when @variables.authenticationKey != "" and @variables.isVerified==False
+                available when @variables.authenticationKey != "" and @variables.isVerified == False
                 with authenticationKey = @variables.authenticationKey
                 with customerCode = ...
                 with customerId = @variables.customerId
@@ -101,7 +120,11 @@ topic ServiceCustomerVerification:
                 set @variables.isVerified = @outputs.isVerified
                 set @variables.VerifiedCustomerId = @outputs.customerId
                 if @variables.isVerified:
-                    transition to @topic.topic_selector
+                    transition to @topic.TopicSelector
+
+    after_reasoning:
+        if @variables.isVerified:
+            transition to @topic.TopicSelector
 
 
     actions:
@@ -194,6 +217,67 @@ topic ServiceCustomerVerification:
             require_user_confirmation: False
             include_in_progress_indicator: True
             source: "SvcCopilotTmpl__VerifyCustomer"
+
+topic TopicSelector:
+    label: "Topic Selector"
+
+    description: "Routes verified customer requests to the appropriate travel support path."
+
+    reasoning:
+        instructions: ->
+            | Handle travel-support requests in this topic.
+            | Use {!@actions.go_to_FlightAssistance} when the customer reports any problem or question related to their flight, or when the customer provides a flight number in response to a previous request.
+            | Use {!@actions.go_to_off_topic} only when the request is clearly outside travel support scope.
+
+        actions:
+            go_to_FlightAssistance: @utils.transition to @topic.FlightAssistance
+                description: "Route to flight assistance when the customer reports flight problems, questions, asks for flight status or provides a flight number."
+
+            go_to_off_topic: @utils.transition to @topic.off_topic
+                description: "Redirect requests outside travel support scope."
+
+topic FlightAssistance:
+    label: "Flight Assistance"
+
+    description: "Handles customer-reported flight problems by looking up the flight status using the provided flight number."
+
+    reasoning:
+        instructions: ->
+            | Acknowledge the customer's flight issue with empathy before proceeding.
+            | Ask the customer for their flight number if it has not been provided yet.
+            | Once the flight number is available, invoke {!@actions.GetFlightStatus} to retrieve the flight status.
+            | Present the returned flight status information clearly to the customer.
+            | Based on the flight status, proactively help the customer understand the impact and next steps:
+                - If the flight is delayed, explain the new departure time and advise the customer on what to do while waiting.
+                - If the flight is cancelled, guide the customer on rebooking options and any compensation entitlements.
+                - If the flight is on time, reassure the customer and confirm there are no disruptions.
+                - For any other status, summarize the information and offer relevant guidance.
+            | Ask if there is anything else you can help with.
+
+        actions:
+            GetFlightStatus: @actions.GetFlightStatus
+                with FlightNumber = ...
+
+    actions:
+        GetFlightStatus:
+            description: "Retrieves the current status of a flight using the flight number provided by the customer."
+            inputs:
+                FlightNumber: string
+                    description: "The flight number provided by the customer."
+                    label: "Flight Number"
+                    is_required: True
+                    is_user_input: True
+            outputs:
+                FlightStatusOutput: object
+                    description: "The flight status details returned by the external service."
+                    label: "Flight Status Output"
+                    complex_data_type_name: "@apexClassType/ExternalService__c__FlightStatus_Getx20Flightx20Status_OUT_2XX?isAuraEnabled=true"
+                    filter_from_agent: False
+                    is_displayable: True
+            target: "flow://Get_Flight_Status"
+            label: "Get Flight Status"
+            require_user_confirmation: False
+            include_in_progress_indicator: True
 
 topic off_topic:
     label: "Off Topic"
