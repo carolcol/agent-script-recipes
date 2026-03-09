@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Late_Arrival_Flag__c</fullName>
+    <label>Late Arrival Notified</label>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+    <description>Indicates whether the hotel has been notified of a late arrival due to a flight delay. Set to true once the agent or customer contacts the hotel.</description>
+</CustomField>

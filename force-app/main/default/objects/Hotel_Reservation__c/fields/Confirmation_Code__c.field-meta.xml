@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Confirmation_Code__c</fullName>
+    <label>Confirmation Code</label>
+    <type>Text</type>
+    <length>50</length>
+    <description>Hotel's confirmation code for the reservation. Provided to the customer or used when contacting the hotel.</description>
+    <unique>true</unique>
+    <caseSensitive>false</caseSensitive>
+</CustomField>

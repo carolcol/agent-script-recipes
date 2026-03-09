@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Original_Check_In_Date__c</fullName>
+    <label>Original Check-In Date</label>
+    <type>Date</type>
+    <description>The original check-in date before any modifications. Preserved to track changes made due to flight delays or other disruptions.</description>
+</CustomField>

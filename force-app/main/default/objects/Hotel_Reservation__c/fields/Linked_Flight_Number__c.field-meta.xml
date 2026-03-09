@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Linked_Flight_Number__c</fullName>
+    <label>Linked Flight Number</label>
+    <type>Text</type>
+    <length>10</length>
+    <description>The flight number associated with this reservation's arrival. Used by the Travel Assist agent to cross-reference flight delays with hotel check-ins.</description>
+</CustomField>

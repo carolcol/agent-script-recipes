@@ -37,6 +37,9 @@ variables:
         source: @MessagingSession.EndUserLanguage
         description: "This variable may also be referred to as MessagingSession EndUserLanguage"
         visibility: "External"
+    hotelReservationId: mutable string = ""
+        description: "Stores the Salesforce Id of the hotel reservation found for a delayed flight."
+        visibility: "Internal"
 
 system:
     instructions: "You are an AI Agent."
@@ -166,7 +169,8 @@ topic ServiceCustomerVerification:
             | Never provide travel guidance or next-step planning before verification succeeds.
             | Never reveal the verification code or internal verification details.
             if @variables.authenticationKey == "":
-                | Ask the customer for their email address.
+                | Tell the customer that before you can help, you need to verify their identity by sending a verification code to their email.
+                | Ask the customer for their email address so you can send them a one-time verification code.
                 | When the customer provides their email address, immediately invoke {!@actions.SendEmailVerificationCode}.
             if @variables.authenticationKey != "" and @variables.isVerified == False:
                 | Ask the customer for the verification code sent to their email.
@@ -218,7 +222,7 @@ topic TopicSelector:
 topic FlightAssistance:
     label: "Flight Assistance"
 
-    description: "Handles customer-reported flight problems by looking up the flight status using the provided flight number."
+    description: "Handles customer-reported flight problems by looking up the flight status using the provided flight number, and manages any linked hotel reservation when a delay is detected."
 
     actions:
         GetFlightStatus:
@@ -241,13 +245,116 @@ topic FlightAssistance:
             include_in_progress_indicator: True
             progress_indicator_message: "Checking your flight status..."
 
+        GetHotelReservationByFlight:
+            description: "Looks up the active hotel reservation for the verified customer using their Contact Id."
+            inputs:
+                contactId: string
+                    description: "The Salesforce Contact Id of the verified customer."
+                    label: "Contact Id"
+                    is_required: True
+                    is_user_input: False
+            outputs:
+                reservationFound: boolean
+                    description: "True if a linked hotel reservation was found."
+                    label: "Reservation Found"
+                    filter_from_agent: False
+                reservationId: string
+                    description: "Salesforce Id of the hotel reservation."
+                    label: "Reservation Id"
+                    filter_from_agent: True
+                hotelName: string
+                    description: "Name of the hotel."
+                    label: "Hotel Name"
+                    filter_from_agent: False
+                city: string
+                    description: "City where the hotel is located."
+                    label: "City"
+                    filter_from_agent: False
+                roomType: string
+                    description: "Type of room booked."
+                    label: "Room Type"
+                    filter_from_agent: False
+                status: string
+                    description: "Current reservation status."
+                    label: "Status"
+                    filter_from_agent: False
+                checkInDate: object
+                    description: "Scheduled check-in date."
+                    label: "Check In Date"
+                    complex_data_type_name: "lightning__dateType"
+                    filter_from_agent: False
+                checkOutDate: object
+                    description: "Scheduled check-out date."
+                    label: "Check Out Date"
+                    complex_data_type_name: "lightning__dateType"
+                    filter_from_agent: False
+                confirmationCode: string
+                    description: "Hotel confirmation code."
+                    label: "Confirmation Code"
+                    filter_from_agent: False
+                expectedArrivalTime: object
+                    description: "Current expected arrival time at the hotel."
+                    label: "Expected Arrival Time"
+                    complex_data_type_name: "lightning__dateTimeStringType"
+                    filter_from_agent: False
+            target: "apex://GetHotelReservationByFlight"
+            label: "Get Hotel Reservation By Flight"
+            require_user_confirmation: False
+            include_in_progress_indicator: True
+            progress_indicator_message: "Checking your hotel reservation..."
+
+        UpdateHotelReservation:
+            description: "Updates the hotel reservation with a new expected arrival time and modification details after a flight delay is confirmed."
+            inputs:
+                reservationId: string
+                    description: "The Salesforce Id of the hotel reservation to update."
+                    label: "Reservation Id"
+                    is_required: True
+                    is_user_input: False
+                expectedArrivalTime: object
+                    description: "New expected arrival time at the hotel."
+                    label: "Expected Arrival Time"
+                    complex_data_type_name: "lightning__dateTimeStringType"
+                    is_required: False
+                    is_user_input: True
+                modificationReason: string
+                    description: "Reason for the modification, recorded by the agent."
+                    label: "Modification Reason"
+                    is_required: False
+                    is_user_input: False
+                lateArrivalFlag: boolean
+                    description: "Set to true when the customer will arrive later than originally planned."
+                    label: "Late Arrival Flag"
+                    is_required: False
+                    is_user_input: False
+            outputs:
+                success: boolean
+                    description: "True if the reservation was updated successfully."
+                    label: "Success"
+                    filter_from_agent: False
+                message: string
+                    description: "Confirmation or error message."
+                    label: "Message"
+                    filter_from_agent: False
+            target: "apex://UpdateHotelReservation"
+            label: "Update Hotel Reservation"
+            require_user_confirmation: True
+            include_in_progress_indicator: True
+            progress_indicator_message: "Updating your hotel reservation..."
+
     reasoning:
         instructions: ->
             | Acknowledge the customer's flight issue with empathy before proceeding.
             | Ask the customer for their flight number if it has not been provided yet.
             | When the customer provides their flight number, immediately invoke {!@actions.GetFlightStatus}.
             | Present the returned flight status information clearly to the customer.
-            | If the flight is delayed, explain the new departure time and advise the customer on what to do while waiting.
+            if @variables.hotelReservationId == "":
+                | If the flight is delayed, immediately invoke {!@actions.GetHotelReservationByFlight} to check for a linked hotel reservation.
+            if @variables.hotelReservationId != "":
+                | A hotel reservation has been found. Inform the customer of the reservation details and ask if they would like to update their expected arrival time.
+                | If the customer agrees, invoke {!@actions.UpdateHotelReservation} with the new expected arrival time.
+                | If the customer declines, acknowledge and offer any other assistance.
+            | If the flight is delayed and no hotel reservation was found, advise the customer on what to do while waiting and offer rebooking guidance.
             | If the flight is cancelled, guide the customer on rebooking options and any compensation entitlements.
             | If the flight is on time, reassure the customer and confirm there are no disruptions.
             | For any other status, summarize the information and offer relevant guidance.
@@ -256,6 +363,18 @@ topic FlightAssistance:
         actions:
             GetFlightStatus: @actions.GetFlightStatus
                 with FlightNumber = ...
+
+            GetHotelReservationByFlight: @actions.GetHotelReservationByFlight
+                available when @variables.hotelReservationId == ""
+                with contactId = @variables.VerifiedCustomerId
+                set @variables.hotelReservationId = @outputs.reservationId
+
+            UpdateHotelReservation: @actions.UpdateHotelReservation
+                available when @variables.hotelReservationId != ""
+                with reservationId = @variables.hotelReservationId
+                with expectedArrivalTime = ...
+                with modificationReason = "Updated by Travel Assist agent due to flight delay."
+                with lateArrivalFlag = True
 
 topic off_topic:
     label: "Off Topic"

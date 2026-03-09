@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Cancellation_Deadline__c</fullName>
+    <label>Cancellation Deadline</label>
+    <type>Date</type>
+    <description>Last date the reservation can be cancelled without penalty. Used by the agent to advise the customer on their options during a flight delay.</description>
+</CustomField>
